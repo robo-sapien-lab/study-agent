@@ -259,6 +259,6 @@ app.add_handler(MessageHandler(filters.TEXT & filters.ChatType.PRIVATE, handle_p
 # Run
 # -----------------------------#
 if __name__ == "__main__":
-    import asyncio
-    asyncio.run(app.run_polling())
+    app.run_polling()
+
 

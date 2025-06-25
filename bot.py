@@ -118,6 +118,54 @@ async def show_history(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🕓 *{t.split('T')[1][:5]}*\n👤 You: {user_msg}\n🤖 Bot: {bot_reply}",
             parse_mode="Markdown"
         )
+# -----------------------------#
+# Handle DM Questions (No Command)
+# -----------------------------#
+async def handle_private_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.chat.type != "private":
+        return  # Skip group chats here
+
+    user = update.effective_user
+    user_id = user.id
+    question = update.message.text.strip()
+
+    if not question:
+        await update.message.reply_text("🤔 Please send a valid question.")
+        return
+
+    await update.message.reply_text("🤖 Thinking...")
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {GROQ_API_KEY}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "llama3-8b-8192",
+                    "messages": [
+                        {"role": "system", "content": "You're an intelligent tutor for grades 6–12. Be clear and friendly."},
+                        {"role": "user", "content": question}
+                    ]
+                },
+                timeout=30
+            )
+            result = response.json()
+            reply = result["choices"][0]["message"]["content"]
+
+            # Save to DB
+            c.execute("""INSERT INTO chat_history (user_id, timestamp, user_message, bot_reply)
+                         VALUES (?, ?, ?, ?)""",
+                      (user_id, datetime.datetime.now().isoformat(), question, reply))
+            conn.commit()
+
+            await update.message.reply_text(f"📬 Answer:\n\n{reply}")
+
+    except Exception as e:
+        await update.message.reply_text("❌ Error fetching answer.")
+        print("Error:", e)
 
 # -----------------------------#
 # Group Message Handler
@@ -205,10 +253,12 @@ app.add_handler(CommandHandler("progress", show_progress))
 app.add_handler(CommandHandler("history", show_history))
 app.add_handler(CallbackQueryHandler(answer_destination_callback))
 app.add_handler(MessageHandler(filters.TEXT & filters.ChatType.GROUPS, handle_group_mention))
+app.add_handler(MessageHandler(filters.TEXT & filters.ChatType.PRIVATE, handle_private_question))
 
 # -----------------------------#
 # Run
 # -----------------------------#
 if __name__ == "__main__":
-    print("🤖 Bot is running...")
-    app.run_polling()
+    import asyncio
+    asyncio.run(app.run_polling())
+

@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: telegram-study-agent
+    env: python
+    plan: free
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot.py
+    envVars:
+      - key: TELEGRAM_TOKEN
+        value: YOUR_TELEGRAM_BOT_TOKEN
+      - key: GROQ_API_KEY
+        value: YOUR_GROQ_API_KEY
+    pythonVersion: 3.11
